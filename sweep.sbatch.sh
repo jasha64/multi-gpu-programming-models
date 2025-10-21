@@ -60,7 +60,7 @@ srun -N ${SLURM_JOB_NUM_NODES} \
 export SRUN_ARGS="--cpu-bind=none --mpi=pmix --environment=cscs-nv-hpc-bench"  # --no-container-remap-root --container-mounts=$CONTAINER_MNTS --container-workdir=/mnt --container-name=$CONTAINER_NAME"
 export OMPI_MCA_coll_hcoll_enable=0
 export MPIRUN_ARGS="--oversubscribe"
-export NCCL_DEBUG=WARN
+export NCCL_DEBUG=${NCCL_DEBUG:-WARN}
 
 # 构建全部目标
 echo "[sweep] building targets"
@@ -98,12 +98,12 @@ export NCCL_DEBUG=WARN
 for g in "${gpu_counts[@]}"; do
     for nx in "${nx_list[@]}"; do
         # NCCL baseline
-        cmd_nccl_base="mpirun ${MPIRUN_ARGS} -x NCCL_DEBUG=WARN -np ${g} ./nccl/jacobi -csv -nx ${nx} -ny ${NY} -niter ${NITER}"
+        cmd_nccl_base="srun ${SRUN_ARGS} -n ${g} ./nccl/jacobi -csv -nx ${nx} -ny ${NY} -niter ${NITER}"
         best_raw=""; best_rt=""
         for rep in $(seq 1 $NREP); do
-            line=$(srun $SRUN_ARGS -n 1 /bin/bash -lc "$cmd_nccl_base")
+            out=$(eval "$cmd_nccl_base" 2>&1)
+            line=$(printf "%s\n" "$out" | grep -E '^(nccl|nccl_graphs|nvshmem),' | tail -n 1)
             rt=$(get_runtime_value "$line")
-            echo "$line"
             if [[ -z "$best_raw" ]]; then best_raw="$line"; best_rt="$rt"; else
                 if (( $(awk -v a="$rt" -v b="$best_rt" 'BEGIN{print (a<b)?1:0}') )); then best_raw="$line"; best_rt="$rt"; fi
             fi
@@ -111,12 +111,12 @@ for g in "${gpu_counts[@]}"; do
         echo "NCCL,$nx,${NY},${NITER},$g,baseline,,$best_rt,$best_raw" | tee -a "$outdir/summary.csv"
 
         # NCCL + CUDA Graphs
-        cmd_nccl_graphs="mpirun ${MPIRUN_ARGS} -np ${g} ./nccl_graphs/jacobi -csv -nx ${nx} -ny ${NY} -niter ${NITER}"
+        cmd_nccl_graphs="srun ${SRUN_ARGS} -n ${g} ./nccl_graphs/jacobi -csv -nx ${nx} -ny ${NY} -niter ${NITER}"
         best_raw=""; best_rt=""
         for rep in $(seq 1 $NREP); do
-            line=$(srun $SRUN_ARGS -n 1 /bin/bash -lc "$cmd_nccl_graphs")
+            out=$(eval "$cmd_nccl_graphs" 2>&1)
+            line=$(printf "%s\n" "$out" | grep -E '^(nccl|nccl_graphs|nvshmem),' | tail -n 1)
             rt=$(get_runtime_value "$line")
-            echo "$line"
             if [[ -z "$best_raw" ]]; then best_raw="$line"; best_rt="$rt"; else
                 if (( $(awk -v a="$rt" -v b="$best_rt" 'BEGIN{print (a<b)?1:0}') )); then best_raw="$line"; best_rt="$rt"; fi
             fi
@@ -125,12 +125,12 @@ for g in "${gpu_counts[@]}"; do
 
         # NVSHMEM variants
         for opts in "" "-neighborhood_sync" "-neighborhood_sync -norm_overlap" "-use_block_comm" "-use_block_comm -neighborhood_sync"; do
-            cmd_nvshmem="mpirun ${MPIRUN_ARGS} -np ${g} -x NVSHMEM_SYMMETRIC_SIZE ./nvshmem/jacobi -csv -nx ${nx} -ny ${NY} -niter ${NITER} ${opts}"
+            cmd_nvshmem="srun ${SRUN_ARGS} -n ${g} ./nvshmem/jacobi -csv -nx ${nx} -ny ${NY} -niter ${NITER} ${opts}"
             best_raw=""; best_rt=""
             for rep in $(seq 1 $NREP); do
-                line=$(srun $SRUN_ARGS -n 1 /bin/bash -lc "$cmd_nvshmem")
+                out=$(eval "$cmd_nvshmem" 2>&1)
+                line=$(printf "%s\n" "$out" | grep -E '^(nccl|nccl_graphs|nvshmem),' | tail -n 1)
                 rt=$(get_runtime_value "$line")
-                echo "$line"
                 if [[ -z "$best_raw" ]]; then best_raw="$line"; best_rt="$rt"; else
                     if (( $(awk -v a="$rt" -v b="$best_rt" 'BEGIN{print (a<b)?1:0}') )); then best_raw="$line"; best_rt="$rt"; fi
                 fi
