@@ -102,12 +102,17 @@ for g in "${gpu_counts[@]}"; do
         best_raw=""; best_rt=""
         for rep in $(seq 1 $NREP); do
             out=$(eval "$cmd_nccl_base" 2>&1)
-            line=$(printf "%s\n" "$out" | grep -E '^(nccl|nccl_graphs|nvshmem),' | tail -n 1)
+            line=$(printf "%s\n" "$out" | grep -E '^((nccl(_graphs)?)|nvshmem)[^,]*,' | tail -n 1 || true)
+            if [[ -z "$line" ]]; then
+                echo "[warn] no CSV line matched for NCCL base (nx=${nx}, g=${g}) on rep=${rep}" >&2
+                continue
+            fi
             rt=$(get_runtime_value "$line")
             if [[ -z "$best_raw" ]]; then best_raw="$line"; best_rt="$rt"; else
                 if (( $(awk -v a="$rt" -v b="$best_rt" 'BEGIN{print (a<b)?1:0}') )); then best_raw="$line"; best_rt="$rt"; fi
             fi
         done
+        if [[ -z "$best_raw" ]]; then best_rt="NA"; best_raw="NA"; fi
         echo "NCCL,$nx,${NY},${NITER},$g,baseline,,$best_rt,$best_raw" | tee -a "$outdir/summary.csv"
 
         # NCCL + CUDA Graphs
@@ -115,12 +120,17 @@ for g in "${gpu_counts[@]}"; do
         best_raw=""; best_rt=""
         for rep in $(seq 1 $NREP); do
             out=$(eval "$cmd_nccl_graphs" 2>&1)
-            line=$(printf "%s\n" "$out" | grep -E '^(nccl|nccl_graphs|nvshmem),' | tail -n 1)
+            line=$(printf "%s\n" "$out" | grep -E '^((nccl(_graphs)?)|nvshmem)[^,]*,' | tail -n 1 || true)
+            if [[ -z "$line" ]]; then
+                echo "[warn] no CSV line matched for NCCL graphs (nx=${nx}, g=${g}) on rep=${rep}" >&2
+                continue
+            fi
             rt=$(get_runtime_value "$line")
             if [[ -z "$best_raw" ]]; then best_raw="$line"; best_rt="$rt"; else
                 if (( $(awk -v a="$rt" -v b="$best_rt" 'BEGIN{print (a<b)?1:0}') )); then best_raw="$line"; best_rt="$rt"; fi
             fi
         done
+        if [[ -z "$best_raw" ]]; then best_rt="NA"; best_raw="NA"; fi
         echo "NCCL,$nx,${NY},${NITER},$g,graphs,,$best_rt,$best_raw" | tee -a "$outdir/summary.csv"
 
         # NVSHMEM variants
@@ -129,12 +139,17 @@ for g in "${gpu_counts[@]}"; do
             best_raw=""; best_rt=""
             for rep in $(seq 1 $NREP); do
                 out=$(eval "$cmd_nvshmem" 2>&1)
-                line=$(printf "%s\n" "$out" | grep -E '^(nccl|nccl_graphs|nvshmem),' | tail -n 1)
+                line=$(printf "%s\n" "$out" | grep -E '^((nccl(_graphs)?)|nvshmem)[^,]*,' | tail -n 1 || true)
+                if [[ -z "$line" ]]; then
+                    echo "[warn] no CSV line matched for NVSHMEM opts='${opts}' (nx=${nx}, g=${g}) on rep=${rep}" >&2
+                    continue
+                fi
                 rt=$(get_runtime_value "$line")
                 if [[ -z "$best_raw" ]]; then best_raw="$line"; best_rt="$rt"; else
                     if (( $(awk -v a="$rt" -v b="$best_rt" 'BEGIN{print (a<b)?1:0}') )); then best_raw="$line"; best_rt="$rt"; fi
                 fi
             done
+            if [[ -z "$best_raw" ]]; then best_rt="NA"; best_raw="NA"; fi
             tag=$(echo "$opts" | tr ' ' '+' | sed 's/^$/baseline/')
             echo "NVSHMEM,$nx,${NY},${NITER},$g,${tag},${opts},$best_rt,$best_raw" | tee -a "$outdir/summary.csv"
         done
