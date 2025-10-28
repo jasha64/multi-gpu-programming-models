@@ -117,7 +117,7 @@ for nodes in "${node_counts[@]}"; do
         fi
         for nx in "${nx_list[@]}"; do
         # NCCL baseline
-        cmd_nccl_base="srun ${SRUN_ARGS} -N ${nodes} --ntasks-per-node=${tpn} -n ${np} --gpus-per-task=1 --gpu-bind=single:1 ./nccl/jacobi -csv -fixed_iter -nx ${nx} -ny ${NY} -niter ${NITER}"
+        cmd_nccl_base="srun ${SRUN_ARGS} -N ${nodes} --ntasks-per-node=${tpn} -n ${np} --gpus-per-task=1 --gpu-bind=single:1 ./nccl/jacobi -csv -nx ${nx} -ny ${NY} -niter ${NITER}"
         best_raw=""; best_rt=""
         for rep in $(seq 1 $NREP); do
             out=$(eval "$cmd_nccl_base" 2>&1)

@@ -179,7 +179,7 @@ int main(int argc, char* argv[]) {
     const int nx = get_argval<int>(argv, argv + argc, "-nx", 16384);
     const int ny = get_argval<int>(argv, argv + argc, "-ny", 16384);
     const bool csv = get_arg(argv, argv + argc, "-csv");
-    const bool fixed_iter = get_arg(argv, argv + argc, "-fixed_iter");
+    // const bool fixed_iter = get_arg(argv, argv + argc, "-fixed_iter");
     bool user_buffer_reg = get_arg(argv, argv + argc, "-user_buffer_reg");
 #if NCCL_UB_SUPPORT == 0
     if (user_buffer_reg) {
@@ -330,7 +330,8 @@ int main(int argc, char* argv[]) {
     MPI_CALL(MPI_Barrier(MPI_COMM_WORLD));
     double start = MPI_Wtime();
     PUSH_RANGE("Jacobi solve", 0)
-    while ((fixed_iter ? true : (l2_norm > tol)) && iter < iter_max) {
+    // while ((fixed_iter ? true : (l2_norm > tol)) && iter < iter_max) {
+    while (iter < iter_max) {
         CUDA_RT_CALL(cudaMemsetAsync(l2_norm_d, 0, sizeof(real), compute_stream));
 
         calculate_norm = (iter % nccheck) == 0 || (!csv && (iter % 100) == 0);
@@ -491,7 +492,8 @@ double single_gpu(const int nx, const int ny, const int iter_max, real* const a_
 
     double start = MPI_Wtime();
     PUSH_RANGE("Jacobi solve", 0)
-    while ((fixed_iter ? true : (l2_norm > tol)) && iter < iter_max) {
+    // while ((fixed_iter ? true : (l2_norm > tol)) && iter < iter_max) {
+    while (iter < iter_max) {
         CUDA_RT_CALL(cudaMemsetAsync(l2_norm_d, 0, sizeof(real), compute_stream));
 
         CUDA_RT_CALL(cudaStreamWaitEvent(compute_stream, push_top_done, 0));

@@ -286,7 +286,7 @@ int main(int argc, char* argv[]) {
     const int ny = get_argval<int>(argv, argv + argc, "-ny", 16384);
     const int nccheck = get_argval<int>(argv, argv + argc, "-nccheck", 1);
     const bool csv = get_arg(argv, argv + argc, "-csv");
-    const bool fixed_iter = get_arg(argv, argv + argc, "-fixed_iter");
+    // const bool fixed_iter = get_arg(argv, argv + argc, "-fixed_iter");
     const bool use_block_comm = get_arg(argv, argv + argc, "-use_block_comm");
     const bool norm_overlap = get_arg(argv, argv + argc, "-norm_overlap");
     const bool neighborhood_sync = get_arg(argv, argv + argc, "-neighborhood_sync");
@@ -496,7 +496,8 @@ int main(int argc, char* argv[]) {
     PUSH_RANGE("Jacobi solve", 0)
     bool l2_norm_greater_than_tol = true;
     
-    while ((fixed_iter ? true : l2_norm_greater_than_tol) && iter < iter_max) {
+    // while ((fixed_iter ? true : l2_norm_greater_than_tol) && iter < iter_max) {
+    while (iter < iter_max) {
         int prev = 0;
         int curr = 0;
         if ( norm_overlap ) {
@@ -692,7 +693,8 @@ double single_gpu(const int nx, const int ny, const int iter_max, real* const a_
     double start = MPI_Wtime();
     PUSH_RANGE("Jacobi solve", 0)
 
-    while ((fixed_iter ? true : (l2_norm > tol)) && iter < iter_max) {
+    // while ((fixed_iter ? true : (l2_norm > tol)) && iter < iter_max) {
+    while (iter < iter_max) {
         CUDA_RT_CALL(cudaMemsetAsync(l2_norm_d, 0, sizeof(real), compute_stream));
 
         jacobi_kernel<dim_block_x, dim_block_y>
