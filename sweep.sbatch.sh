@@ -255,7 +255,7 @@ for nodes in "${node_counts[@]}"; do
         # done
         # if [[ -z "$best_raw" ]]; then best_rt="NA"; best_raw="NA"; fi
         # echo "NCCL,$nx,${NY},${NITER},${nodes},${np},overlap,,$best_rt,$best_raw" | tee -a "$outdir/summary.csv"
-        # done
+        done
     done
 done
 
