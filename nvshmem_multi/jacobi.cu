@@ -220,14 +220,28 @@ __global__ void jacobi_block_comm_kernel(real* __restrict__ const a_new, const r
     int block_ix = ix - threadIdx.x; /* Alternatively, block_ix = blockIdx.x * blockDim.x + 1 */
 
     /* Communicate the boundaries */
-    if ((block_iy <= iy_start) && (iy_start < block_iy + blockDim.y)) {
-        nvshmemx_float_put_nbi_block(a_new + top_iy * nx + block_ix, a_new + iy_start * nx + block_ix,
-                                   min(blockDim.x, nx - 1 - block_ix), top_pe);
-    }
-    if ((block_iy < iy_end) && (iy_end <= block_iy + blockDim.y)) {
-        nvshmemx_float_put_nbi_block(a_new + bottom_iy * nx + block_ix,
-                                   a_new + (iy_end - 1) * nx + block_ix,
-                                   min(blockDim.x, nx - 1 - block_ix), bottom_pe);
+    // Multi-CTA explicit slicing across the interior X-range [1, nx-2]
+    int nblocks_x = gridDim.x;
+    int bid_x = blockIdx.x;
+    int interior_elems = nx - 2;
+    if (interior_elems < 0) interior_elems = 0;
+    int elems_per_block = (interior_elems + nblocks_x - 1) / nblocks_x; // ceil-div
+    int start_ix = 1 + bid_x * elems_per_block;
+    int end_ix_exclusive = start_ix + elems_per_block;
+    if (end_ix_exclusive > (nx - 1)) end_ix_exclusive = (nx - 1);
+    int len = end_ix_exclusive - start_ix;
+
+    if (len > 0) {
+        if ((block_iy <= iy_start) && (iy_start < block_iy + blockDim.y)) {
+            nvshmemx_float_put_nbi_block(a_new + top_iy * nx + start_ix,
+                                         a_new + iy_start * nx + start_ix,
+                                         len, top_pe);
+        }
+        if ((block_iy < iy_end) && (iy_end <= block_iy + blockDim.y)) {
+            nvshmemx_float_put_nbi_block(a_new + bottom_iy * nx + start_ix,
+                                         a_new + (iy_end - 1) * nx + start_ix,
+                                         len, bottom_pe);
+        }
     }
 
 #ifdef HAVE_CUB
