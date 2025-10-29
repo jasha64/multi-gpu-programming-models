@@ -2,7 +2,7 @@
 
 #SBATCH -J mgpm-sweep
 #SBATCH -p normal
-#SBATCH -N 1
+#SBATCH -N 2
 #SBATCH --gres=gpu:4
 #SBATCH -n 4
 #SBATCH -t 03:00:00
@@ -25,7 +25,7 @@ set -euo pipefail
 # CONTAINER_MNTS=$LUSTRE/workspace/multi-gpu-programming-models:/mnt
 
 # 默认 sweep 配置，可通过环境变量覆盖
-: "${NODE_COUNTS:=1}"
+: "${NODE_COUNTS:=1,2}"
 : "${TASKS_PER_NODE_LIST:=}"
 : "${NX_LIST:=128,256,512,1024,2048,4096,8192}"
 : "${NY:=16384}"
@@ -153,7 +153,7 @@ for nodes in "${node_counts[@]}"; do
         # echo "NCCL,$nx,${NY},${NITER},${nodes},${np},graphs,,$best_rt,$best_raw" | tee -a "$outdir/summary.csv"
 
         # NVSHMEM variants
-        for opts in "" "-neighborhood_sync" "-neighborhood_sync" "-use_block_comm" "-use_block_comm -neighborhood_sync"; do
+        for opts in "" "-neighborhood_sync" "-use_block_comm" "-use_block_comm -neighborhood_sync"; do
                 cmd_nvshmem="srun ${SRUN_ARGS} -N ${nodes} --ntasks-per-node=${tpn} -n ${np} --gpus-per-task=1 --gpu-bind=single:1 ./nvshmem/jacobi -csv -nx ${nx} -ny ${NY} -niter ${NITER} ${opts}"
                 best_raw=""; best_rt=""
                 for rep in $(seq 1 $NREP); do
@@ -174,8 +174,8 @@ for nodes in "${node_counts[@]}"; do
         done
 
         # NVSHMEM multi-CTA variant
-        for opts in "" "-neighborhood_sync" "-neighborhood_sync -norm_overlap" "-use_block_comm" "-use_block_comm -neighborhood_sync"; do
-                cmd_nvshmem_multi="srun ${SRUN_ARGS} -N ${nodes} --ntasks-per-node=${tpn} -n ${np} --gpus-per-task=1 --gpu-bind=single:1 ./nvshmem_multi/jacobi -csv -nx ${nx} -ny ${NY} -niter ${NITER} ${opts}"
+        for opts in "" "-neighborhood_sync"; do
+                cmd_nvshmem_multi="srun ${SRUN_ARGS} -N ${nodes} --ntasks-per-node=${tpn} -n ${np} --gpus-per-task=1 --gpu-bind=single:1 ./nvshmem_multi/jacobi -csv -nx ${nx} -ny ${NY} -niter ${NITER} ${opts} -use_block_comm"
                 best_raw=""; best_rt=""
                 for rep in $(seq 1 $NREP); do
                     out=$(eval "$cmd_nvshmem_multi" 2>&1)
@@ -190,7 +190,7 @@ for nodes in "${node_counts[@]}"; do
                     fi
                 done
                 if [[ -z "$best_raw" ]]; then best_rt="NA"; best_raw="NA"; fi
-                tag=$(echo "$opts" | tr ' ' '+' | sed 's/^$/multi/')
+                tag=$(echo "multi+$opts" | tr ' ' '+')
                 echo "NVSHMEM,$nx,${NY},${NITER},${nodes},${np},${tag},${opts},$best_rt,$best_raw" | tee -a "$outdir/summary.csv"
         done
 
